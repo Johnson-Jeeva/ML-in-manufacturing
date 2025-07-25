@@ -1,0 +1,69 @@
+﻿// JMP + Python: Lasso Regression
+dt = Current Data Table();
+Python Send( dt );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import Lasso
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
+import jmp
+
+# ----- Parameters -----
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+alpha = 1.0  # Regularization strength
+
+# Load JMP table
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+
+# Feature/target separation
+X = df.drop(columns=[target_column])
+X = X.select_dtypes(include=[np.number])
+y = df[target_column]
+
+# Train/test split
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+# Fit model
+model = Lasso(alpha=alpha, random_state=random_state)
+model.fit(X_train, y_train)
+
+# Predict
+y_train_pred = model.predict(X_train)
+y_val_pred = model.predict(X_val)
+
+# Build aligned predictions for JMP
+preds = pd.Series(index=df.index, dtype='float64')
+actuals = pd.Series(index=df.index, dtype='float64')
+sets = pd.Series(index=df.index, dtype='object')
+preds[X_train.index] = y_train_pred
+preds[X_val.index] = y_val_pred
+actuals[X_train.index] = y_train
+actuals[X_val.index] = y_val
+sets[X_train.index] = 'Training'
+sets[X_val.index] = 'Validation'
+
+# Convert to JMP lists
+pred_list = preds.tolist()
+actual_list = actuals.tolist()
+set_list = sets.tolist()
+
+# Print metrics
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Training N:', len(y_train))
+print()
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+print('Validation N:', len(y_val))
+" );
+
+dt << New Column("Lasso_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ));
+dt << New Column("Lasso_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ));
+dt << New Column("Lasso_Split", Character, Set Values( Python Get( set_list ) ));
