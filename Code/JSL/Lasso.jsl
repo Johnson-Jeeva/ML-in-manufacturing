@@ -1,0 +1,106 @@
+﻿// JMP + Python: Lasso Regression with Top 25 Coefficient Plot
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import Lasso
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
+import matplotlib.pyplot as plt
+import os
+import jmp
+
+# ----- Parameters -----
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+alpha = 1.0  # Regularization strength
+
+# Load JMP table
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+
+# Feature/target separation
+X = df.drop(columns=[target_column])
+X = X.select_dtypes(include=[np.number])
+y = df[target_column]
+
+# Train/test split
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+# Fit model
+model = Lasso(alpha=alpha, random_state=random_state, max_iter=10000)
+model.fit(X_train, y_train)
+
+# Predict
+y_train_pred = model.predict(X_train)
+y_val_pred = model.predict(X_val)
+
+# Build results DataFrame
+results = pd.DataFrame(index=df.index)
+results['Lasso_Predicted'] = np.nan
+results['Lasso_Actual'] = np.nan
+results['Lasso_Residual'] = np.nan
+results['Lasso_Split'] = 'Unassigned'
+
+results.loc[X_train.index, 'Lasso_Predicted'] = y_train_pred
+results.loc[X_train.index, 'Lasso_Actual'] = y_train
+results.loc[X_train.index, 'Lasso_Residual'] = y_train - y_train_pred
+results.loc[X_train.index, 'Lasso_Split'] = 'Training'
+
+results.loc[X_val.index, 'Lasso_Predicted'] = y_val_pred
+results.loc[X_val.index, 'Lasso_Actual'] = y_val
+results.loc[X_val.index, 'Lasso_Residual'] = y_val - y_val_pred
+results.loc[X_val.index, 'Lasso_Split'] = 'Validation'
+
+results = results.fillna(0)
+
+# Convert predictions to lists
+pred_list = results['Lasso_Predicted'].tolist()
+actual_list = results['Lasso_Actual'].tolist()
+residual_list = results['Lasso_Residual'].tolist()
+set_list = results['Lasso_Split'].tolist()
+
+# ----- Top 25 Non-Zero Coefficient Plot -----
+coef_values = model.coef_
+features = X.columns
+coef_df = pd.DataFrame({'Feature': features, 'Coefficient': coef_values})
+coef_df = coef_df[coef_df['Coefficient'] != 0]  # Keep only non-zero
+coef_df['AbsCoef'] = coef_df['Coefficient'].abs()
+coef_df = coef_df.sort_values(by='AbsCoef', ascending=False).head(25)
+
+plt.figure(figsize=(8, 6))
+plt.barh(coef_df['Feature'], coef_df['Coefficient'], color='black')
+plt.title('Top 25 Lasso Coefficients', fontsize=12, weight='bold')
+plt.xlabel('Coefficient Value')
+plt.ylabel('Feature')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+
+coef_image_path = os.path.join(script_path, 'Lasso_top25_coefficients.png')
+plt.savefig(coef_image_path, dpi=110, bbox_inches='tight')
+
+# Print metrics
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+" );
+
+// --- Create NEW table for results ---
+newTable = New Table( "Lasso_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "Lasso_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "Lasso_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "Lasso_Residual", Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "Lasso_Split", Character, Set Values( Python Get( set_list ) ) )
+);
+
+// --- Open PNG plot automatically ---
+Open( script_path || "/" || "Lasso_top25_coefficients.png" );

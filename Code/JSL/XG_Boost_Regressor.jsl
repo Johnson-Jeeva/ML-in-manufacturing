@@ -1,0 +1,147 @@
+﻿/// XGBoost Regression in JMP + Python
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from xgboost import XGBRegressor, plot_importance
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.inspection import permutation_importance
+import matplotlib.pyplot as plt
+import os
+import jmp
+
+# -----------------------------
+# Parameters
+# -----------------------------
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+n_estimators = 200
+max_depth = 6
+learning_rate = 0.1
+
+# -----------------------------
+# Load data from JMP
+# -----------------------------
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+
+# Clean column names
+df.columns = df.columns.astype(str).str.strip()
+
+# -----------------------------
+# Train-test split
+# -----------------------------
+X = df.drop(columns=[target_column])
+y = df[target_column]
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+# -----------------------------
+# Train XGBoost model
+# -----------------------------
+model = XGBRegressor(
+    n_estimators=n_estimators,
+    max_depth=max_depth,
+    learning_rate=learning_rate,
+    random_state=random_state,
+    objective='reg:squarederror',
+    n_jobs=-1
+)
+model.fit(X_train, y_train)
+
+# -----------------------------
+# 1) Feature Importance Plot
+# -----------------------------
+plt.figure(figsize=(8, 6))
+plot_importance(model, importance_type='gain', max_num_features=25, height=0.5, color='black')
+plt.title('Top 25 Feature Importances (XGBoost)', fontsize=12, weight='bold')
+plt.tight_layout()
+feat_image_path = os.path.join(script_path, 'XGB_feature_importance.png')
+plt.savefig(feat_image_path, dpi=100, bbox_inches='tight')
+plt.close()
+
+# -----------------------------
+# 2) Permutation Importance Plot (Optional)
+# -----------------------------
+try:
+    perm = permutation_importance(model, X_val, y_val, n_repeats=10, random_state=random_state)
+    perm_df = pd.DataFrame({'Feature': X.columns, 'Importance': perm.importances_mean})
+    perm_df = perm_df.sort_values(by='Importance', ascending=False).head(25)
+
+    plt.figure(figsize=(8, 6))
+    plt.barh(perm_df['Feature'], perm_df['Importance'], color='black')
+    plt.title('Top 25 Permutation Importances (XGBoost)', fontsize=12, weight='bold')
+    plt.xlabel('Mean Importance')
+    plt.ylabel('Feature')
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+    perm_image_path = os.path.join(script_path, 'XGB_permutation_importance.png')
+    plt.savefig(perm_image_path, dpi=100, bbox_inches='tight')
+    plt.close()
+except Exception as e:
+    print('Permutation importance could not be computed:', str(e))
+    perm_image_path = None
+
+# -----------------------------
+# Predictions
+# -----------------------------
+y_train_pred = model.predict(X_train)
+y_val_pred = model.predict(X_val)
+
+# Create results DataFrame
+results = pd.DataFrame(index=df.index)
+results['XGB_Predicted'] = np.nan
+results['XGB_Actual'] = np.nan
+results['XGB_Residual'] = np.nan
+results['XGB_Split'] = 'Unassigned'
+
+# Populate training results
+results.loc[X_train.index, 'XGB_Predicted'] = y_train_pred
+results.loc[X_train.index, 'XGB_Actual'] = y_train
+results.loc[X_train.index, 'XGB_Residual'] = y_train - y_train_pred
+results.loc[X_train.index, 'XGB_Split'] = 'Training'
+
+# Populate validation results
+results.loc[X_val.index, 'XGB_Predicted'] = y_val_pred
+results.loc[X_val.index, 'XGB_Actual'] = y_val
+results.loc[X_val.index, 'XGB_Residual'] = y_val - y_val_pred
+results.loc[X_val.index, 'XGB_Split'] = 'Validation'
+
+results = results.fillna(0)
+
+# Convert results to lists for JMP
+pred_list = results['XGB_Predicted'].tolist()
+actual_list = results['XGB_Actual'].tolist()
+residual_list = results['XGB_Residual'].tolist()
+set_list = results['XGB_Split'].tolist()
+
+# -----------------------------
+# Print performance metrics
+# -----------------------------
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+" );
+
+/// --- Create NEW table in JMP ---
+newTable = New Table( "XGBoost_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "XGB_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "XGB_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "XGB_Residual", Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "XGB_Split", Character, Set Values( Python Get( set_list ) ) )
+);
+
+/// --- Open PNG plots ---
+Open( script_path || "/" || "XGB_feature_importance.png" );
+If( File Exists( script_path || "/" || "XGB_permutation_importance.png" ),
+    Open( script_path || "/" || "XGB_permutation_importance.png" )
+);

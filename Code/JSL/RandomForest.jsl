@@ -1,0 +1,153 @@
+﻿/// Random Forest in JMP + Python
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import plot_tree
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.inspection import permutation_importance
+import matplotlib.pyplot as plt
+import os
+import jmp
+
+# -----------------------------
+# Parameters
+# -----------------------------
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+max_depth = 6
+n_estimators = 100
+
+# -----------------------------
+# Load data from JMP
+# -----------------------------
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+
+# Clean column names to avoid hidden spaces or formatting issues
+df.columns = df.columns.astype(str).str.strip()
+
+# -----------------------------
+# Train-test split
+# -----------------------------
+X = df.drop(columns=[target_column])
+y = df[target_column]
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+# -----------------------------
+# Train Random Forest model
+# -----------------------------
+model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)
+model.fit(X_train, y_train)
+
+# -----------------------------
+# 1) Tree Visualization (First Tree)
+# -----------------------------
+plt.figure(figsize=(12, 8))
+plot_tree(model.estimators_[0], feature_names=X.columns, filled=True, rounded=True, fontsize=8, max_depth=4)
+plt.title('Random Forest - First Tree Visualization', fontsize=14, weight='bold')
+plt.tight_layout()
+tree_image_path = os.path.join(script_path, 'RF_tree_viz.png')
+plt.savefig(tree_image_path, dpi=100, bbox_inches='tight')
+plt.close()
+
+# -----------------------------
+# 2) Feature Importance Plot
+# -----------------------------
+importance = model.feature_importances_
+feat_df = pd.DataFrame({'Feature': X.columns, 'Importance': importance})
+feat_df = feat_df.sort_values(by='Importance', ascending=False).head(25)
+
+plt.figure(figsize=(8, 6))
+plt.barh(feat_df['Feature'], feat_df['Importance'], color='black')
+plt.title('Top 25 Feature Importances (Random Forest)', fontsize=12, weight='bold')
+plt.xlabel('Importance')
+plt.ylabel('Feature')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+feat_image_path = os.path.join(script_path, 'RF_feature_importance.png')
+plt.savefig(feat_image_path, dpi=100, bbox_inches='tight')
+plt.close()
+
+# -----------------------------
+# 3) Permutation Importance Plot
+# -----------------------------
+perm = permutation_importance(model, X_val, y_val, n_repeats=10, random_state=random_state)
+perm_df = pd.DataFrame({'Feature': X.columns, 'Importance': perm.importances_mean})
+perm_df = perm_df.sort_values(by='Importance', ascending=False).head(25)
+
+plt.figure(figsize=(8, 6))
+plt.barh(perm_df['Feature'], perm_df['Importance'], color='black')
+plt.title('Top 25 Permutation Importances (Random Forest)', fontsize=12, weight='bold')
+plt.xlabel('Mean Importance')
+plt.ylabel('Feature')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+perm_image_path = os.path.join(script_path, 'RF_permutation_importance.png')
+plt.savefig(perm_image_path, dpi=100, bbox_inches='tight')
+plt.close()
+
+# -----------------------------
+# Predictions for Training and Validation sets
+# -----------------------------
+y_train_pred = model.predict(X_train)
+y_val_pred = model.predict(X_val)
+
+# Create results DataFrame
+results = pd.DataFrame(index=df.index)
+results['RF_Predicted'] = np.nan
+results['RF_Actual'] = np.nan
+results['RF_Residual'] = np.nan
+results['RF_Split'] = 'Unassigned'
+
+# Populate training results
+results.loc[X_train.index, 'RF_Predicted'] = y_train_pred
+results.loc[X_train.index, 'RF_Actual'] = y_train
+results.loc[X_train.index, 'RF_Residual'] = y_train - y_train_pred
+results.loc[X_train.index, 'RF_Split'] = 'Training'
+
+# Populate validation results
+results.loc[X_val.index, 'RF_Predicted'] = y_val_pred
+results.loc[X_val.index, 'RF_Actual'] = y_val
+results.loc[X_val.index, 'RF_Residual'] = y_val - y_val_pred
+results.loc[X_val.index, 'RF_Split'] = 'Validation'
+
+results = results.fillna(0)
+
+# Convert results to lists for JMP
+pred_list = results['RF_Predicted'].tolist()
+actual_list = results['RF_Actual'].tolist()
+residual_list = results['RF_Residual'].tolist()
+set_list = results['RF_Split'].tolist()
+
+# -----------------------------
+# Print model performance metrics
+# -----------------------------
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+" );
+
+/// --- Create NEW table in JMP ---
+newTable = New Table( "Random_Forest_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "RF_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "RF_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "RF_Residual", Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "RF_Split", Character, Set Values( Python Get( set_list ) ) )
+);
+
+/// --- Open all PNG plots ---
+Open( script_path || "/" || "RF_tree_viz.png" );
+Open( script_path || "/" || "RF_feature_importance.png" );
+Open( script_path || "/" || "RF_permutation_importance.png" );

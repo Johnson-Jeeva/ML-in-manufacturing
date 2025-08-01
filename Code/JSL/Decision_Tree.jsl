@@ -1,0 +1,92 @@
+﻿/// Decision Tree in JMP + Python
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from sklearn.tree import DecisionTreeRegressor, plot_tree
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
+import matplotlib.pyplot as plt
+import os
+import jmp
+
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+max_depth = 3
+
+# Load data from JMP
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+
+# Train-test split
+target_column = target_column.strip()
+X = df.drop(columns=[target_column])
+y = df[target_column]
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=random_state)
+
+# Train Decision Tree
+model = DecisionTreeRegressor(max_depth=max_depth, random_state=random_state)
+model.fit(X_train, y_train)
+
+# --- Save Tree Plot ---
+plt.figure(figsize=(12, 8))
+plot_tree(model, feature_names=X.columns, filled=True, rounded=True, fontsize=4, max_depth=max_depth)
+plt.title('Decision Tree - Split Visualization', fontsize=14, weight='bold')
+plt.tight_layout()
+tree_image_path = os.path.join(script_path, 'DT_tree_viz.png')
+plt.savefig(tree_image_path, dpi=150, bbox_inches='tight')
+
+
+# Predictions
+y_train_pred = model.predict(X_train)
+y_val_pred = model.predict(X_val)
+
+# Create result DataFrame
+results = pd.DataFrame(index=df.index)
+results['DT_Predicted'] = 0.0
+results['DT_Actual'] = 0.0
+results['DT_Residual'] = 0.0
+results['DT_Split'] = 'Unassigned'
+
+# Fill train
+results.loc[X_train.index, 'DT_Predicted'] = y_train_pred
+results.loc[X_train.index, 'DT_Actual'] = y_train
+results.loc[X_train.index, 'DT_Residual'] = y_train - y_train_pred
+results.loc[X_train.index, 'DT_Split'] = 'Training'
+
+# Fill validation
+results.loc[X_val.index, 'DT_Predicted'] = y_val_pred
+results.loc[X_val.index, 'DT_Actual'] = y_val
+results.loc[X_val.index, 'DT_Residual'] = y_val - y_val_pred
+results.loc[X_val.index, 'DT_Split'] = 'Validation'
+
+# Convert to lists for JMP
+pred_list = results['DT_Predicted'].tolist()
+actual_list = results['DT_Actual'].tolist()
+residual_list = results['DT_Residual'].tolist()
+set_list = results['DT_Split'].tolist()
+
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+" );
+
+/// --- Create NEW table in JMP ---
+newTable = New Table( "Decision_Tree_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "DT_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "DT_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "DT_Residual", Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "DT_Split", Character, Set Values( Python Get( set_list ) ) )
+);
+
+/// Open Decision Tree image
+Open( script_path || "DT_tree_viz.png" );
