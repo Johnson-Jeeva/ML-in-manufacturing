@@ -1,0 +1,5 @@
+Xgboost - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Xgboost.py" "C1" "C220" "--trees" "500" "--depth" "6" "--lr" "0.05"
+decision tree - PYSC "C:\Users\johnsonjeeva\Desktop\Models\DT_Tree.py" "C1" "C220" "--depth" "6" "--minsplit" "2"
+Ridge - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Ridge.py" "C1" "C220" 
+Lasso - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Lasso.py" "C1" "C220" 
+RandomForest - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Random_Forest.py" "C1" "C220" "--maxdepth" "3"
