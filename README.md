@@ -1,6 +1,6 @@
 # Machine Learning in Manufacturing – Model Testing
 
-This repository provides ready-to-use Python scripts for building, training, and evaluating machine learning models on manufacturing datasets. It is designed for **JMP** and **Minitab** users, enabling quick experimentation with predictive models for applications such as **process optimization, quality control, and performance forecasting**.
+This repository provides ready-to-use Python scripts for building, training and evaluating machine learning models on manufacturing datasets. It is designed for **JMP** and **Minitab** users, enabling quick experimentation with predictive models for applications such as **process optimization, quality control and performance forecasting**.
 
 ---
 
@@ -57,7 +57,7 @@ Note: This dataset should be opened in **JMP** or loaded into **Minitab** before
 - Ridge
 - Lasso
 3. Run the script to:
-- Train the model  
+- Train the model and see the evaluation metrics
 - Generate a results table (Predicted, Actual, Residual, Data Split)  
 - Save relevant plots (PNG) for model evaluation  
 
