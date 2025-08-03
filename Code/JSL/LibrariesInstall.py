@@ -10,6 +10,7 @@ required_libraries = [
     'pandas',
     'matplotlib',
     'scikit-learn',
+    'tensorflow',
     'xgboost'
 ]
 
