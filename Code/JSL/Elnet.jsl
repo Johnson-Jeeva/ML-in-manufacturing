@@ -1,0 +1,133 @@
+﻿/// Elnet(Ridge+Lasso) in JMP + Python
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import ElasticNet
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score, mean_squared_error
+import matplotlib.pyplot as plt
+import os
+import jmp
+
+# -----------------------------
+# Parameters
+# -----------------------------
+target_column = 'Strength2'
+test_size = 0.3
+random_state = 42
+alpha = 0.5           # Regularization strength
+l1_ratio = 0.5        # Mix between Lasso and Ridge
+script_path = script_path
+
+# -----------------------------
+# Load data from JMP
+# -----------------------------
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+df.columns = df.columns.astype(str).str.strip()
+
+# -----------------------------
+# Train-test split
+# -----------------------------
+X = df.drop(columns=[target_column])
+y = df[target_column]
+
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=test_size, random_state=random_state
+)
+
+# -----------------------------
+# Scale features
+# -----------------------------
+scaler_X = StandardScaler()
+X_train_scaled = scaler_X.fit_transform(X_train)
+X_val_scaled = scaler_X.transform(X_val)
+
+# -----------------------------
+# Elastic Net Regression
+# -----------------------------
+model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=random_state)
+model.fit(X_train_scaled, y_train)
+
+y_train_pred = model.predict(X_train_scaled)
+y_val_pred = model.predict(X_val_scaled)
+
+# -----------------------------
+# Feature Importance (Coefficients)
+# -----------------------------
+coef = model.coef_
+importance_df = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': np.abs(coef)
+})
+importance_df = importance_df.sort_values(by='Importance', ascending=False).head(25)
+
+plt.figure(figsize=(8, 6))
+plt.barh(importance_df['Feature'], importance_df['Importance'], color='black')
+plt.title('Top 25 Feature Importances (ElasticNet Coefficients)', fontsize=12, weight='bold')
+plt.xlabel('Absolute Coefficient Value')
+plt.ylabel('Feature')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+importance_image_path = os.path.join(script_path, 'Elnet_feature_importance.png')
+plt.savefig(importance_image_path, dpi=100, bbox_inches='tight')
+plt.close()
+
+
+# -----------------------------
+# Results DataFrame
+# -----------------------------
+results = pd.DataFrame(index=df.index)
+results['Elnet_Predicted'] = np.nan
+results['Elnet_Actual'] = np.nan
+results['Elnet_Residual'] = np.nan
+results['Elnet_Split'] = 'Unassigned'
+
+results.loc[X_train.index, 'Elnet_Predicted'] = y_train_pred
+results.loc[X_train.index, 'Elnet_Actual'] = y_train
+results.loc[X_train.index, 'Elnet_Residual'] = train_residuals
+results.loc[X_train.index, 'Elnet_Split'] = 'Training'
+
+results.loc[X_val.index, 'Elnet_Predicted'] = y_val_pred
+results.loc[X_val.index, 'Elnet_Actual'] = y_val
+results.loc[X_val.index, 'Elnet_Residual'] = val_residuals
+results.loc[X_val.index, 'Elnet_Split'] = 'Validation'
+
+results = results.fillna(0)
+
+# -----------------------------
+# Send lists to JMP
+# -----------------------------
+pred_list = results['Elnet_Predicted'].tolist()
+actual_list = results['Elnet_Actual'].tolist()
+residual_list = results['Elnet_Residual'].tolist()
+set_list = results['Elnet_Split'].tolist()
+
+# -----------------------------
+# Print model performance
+# -----------------------------
+print('Training R²:', r2_score(y_train, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train, y_train_pred)))
+print('Validation R²:', r2_score(y_val, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val, y_val_pred)))
+" );
+
+/// --- Create NEW table in JMP ---
+newTable = New Table( "Elnet_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "Elnet_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "Elnet_Actual", Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "Elnet_Residual", Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "Elnet_Split", Character, Set Values( Python Get( set_list ) ) )
+);
+
+/// --- Open Elastic Net Regression Plots ---
+Open( script_path || "/" || "Elnet_feature_importance.png" );
