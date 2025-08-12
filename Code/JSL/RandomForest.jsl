@@ -1,7 +1,7 @@
 ﻿/// Random Forest in JMP + Python
 dt = Current Data Table();
 Curr_path = Get Default Directory();
-script_path = Convert File Path( Curr_path, If( Host Is( "Windows" ), "Windows", "Mac" ) );
+script_path = Convert File Path( Curr_path, "Windows" );  // Switch between Windows and Mac
 Python Send( dt );
 Python Send( script_path );
 
