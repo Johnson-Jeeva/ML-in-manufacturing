@@ -11,10 +11,10 @@ libraries = {
     'pandas': 'pandas',
     'matplotlib': 'matplotlib',
     'scikit-learn': 'sklearn',
-    'tensorflow': 'tensorflow',
     'xgboost': 'xgboost'
     # Add more libraries here as needed
     # 'lightgbm': 'lightgbm',
+    # 'tensorflow': 'tensorflow',
     # 'seaborn': 'seaborn'
 }
 
