@@ -83,7 +83,7 @@ X_test  = scaler.transform(X_test)
 # ---------------------------
 # Elastic Net with Cross-Validation
 # ---------------------------
-alphas = np.logspace(-2, 3, 80)   # 0.01 to 1000 (same scale as LASSO script)
+alphas = np.logspace(-2, 3, 80)   # 0.01 to 1000
 l1_grid = [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]  # blend (1.0 == LASSO-like)
 
 model = ElasticNetCV(
@@ -176,4 +176,5 @@ plt.xlabel("Predicted")
 plt.ylabel("Residuals")
 plt.tight_layout()
 plt.savefig("ELNET_residual_analysis.png", dpi=300)
+
 mtb.add_image("ELNET_residual_analysis.png")
