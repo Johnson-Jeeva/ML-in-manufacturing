@@ -1,0 +1,151 @@
+﻿/// ANN (Keras) in JMP + Python
+dt = Current Data Table();
+script_path = Get Default Directory();
+Python Send( dt );
+Python Send( script_path );
+
+Python Submit( "
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import jmp
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score, mean_squared_error
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.callbacks import EarlyStopping
+
+# -----------------------------
+# Parameters
+# -----------------------------
+target_column = 'Strength2'
+test_size = 0.30
+random_state = 42
+epochs = 300
+batch_size = 64
+
+# -----------------------------
+# Load data from JMP
+# -----------------------------
+ncols = dt.ncols
+col_names = [jmp.DataTable.Column(dt, i).name for i in range(ncols)]
+data = {name: jmp.DataTable.Column(dt, name)[:] for name in col_names}
+df = pd.DataFrame(data)
+df.columns = df.columns.astype(str).str.strip()
+
+# -----------------------------
+# Train-test split
+# -----------------------------
+X = df.drop(columns=[target_column])
+y = df[target_column]
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=test_size, random_state=random_state
+)
+
+# -----------------------------
+# Scale features + target
+# -----------------------------
+scaler_X = StandardScaler()
+X_train_scaled = scaler_X.fit_transform(X_train)
+X_val_scaled   = scaler_X.transform(X_val)
+
+scaler_y = StandardScaler()
+y_train_scaled = scaler_y.fit_transform(y_train.values.reshape(-1,1))
+y_val_scaled   = scaler_y.transform(y_val.values.reshape(-1,1))
+
+# -----------------------------
+# Build ANN
+# -----------------------------
+model_ann = Sequential([
+    Dense(512, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+    Dense(256, activation='relu'),
+    Dense(128, activation='relu'),
+    Dense(64,  activation='relu'),
+    Dense(1,   activation='linear')
+])
+model_ann.compile(optimizer='adam', loss='mse')
+
+early_stop = EarlyStopping(monitor='loss', patience=15, restore_best_weights=True)
+
+# -----------------------------
+# Train
+# -----------------------------
+history = model_ann.fit(
+    X_train_scaled, y_train_scaled,
+    epochs=epochs, batch_size=batch_size, verbose=0,
+    callbacks=[early_stop]
+)
+
+# -----------------------------
+# Save loss curve
+# -----------------------------
+plt.figure(figsize=(8,6))
+plt.plot(history.history['loss'], label='Training Loss')
+plt.title('ANN Training Loss')
+plt.xlabel('Epoch'); plt.ylabel('MSE'); plt.legend(); plt.tight_layout()
+loss_image_path = os.path.join(script_path, 'ANN_loss_curve.png')
+plt.savefig(loss_image_path, dpi=120, bbox_inches='tight')
+plt.close()
+
+# -----------------------------
+# Predictions (inverse-transform)
+# -----------------------------
+y_train_pred_scaled = model_ann.predict(X_train_scaled)
+y_val_pred_scaled   = model_ann.predict(X_val_scaled)
+
+y_train_pred = scaler_y.inverse_transform(y_train_pred_scaled).ravel()
+y_val_pred   = scaler_y.inverse_transform(y_val_pred_scaled).ravel()
+
+# -----------------------------
+# Results frame aligned to original rows
+# -----------------------------
+results = pd.DataFrame(index=df.index)
+results['ANN_Predicted'] = np.nan
+results['ANN_Actual']    = np.nan
+results['ANN_Residual']  = np.nan
+results['ANN_Split']     = 'Unassigned'
+
+results.loc[X_train.index,'ANN_Predicted'] = y_train_pred
+results.loc[X_train.index,'ANN_Actual']    = y_train.values
+results.loc[X_train.index,'ANN_Residual']  = y_train.values - y_train_pred
+results.loc[X_train.index,'ANN_Split']     = 'Training'
+
+results.loc[X_val.index,'ANN_Predicted'] = y_val_pred
+results.loc[X_val.index,'ANN_Actual']    = y_val.values
+results.loc[X_val.index,'ANN_Residual']  = y_val.values - y_val_pred
+results.loc[X_val.index,'ANN_Split']     = 'Validation'
+
+results = results.fillna(0)
+
+# -----------------------------
+# Convert to lists for JMP
+# -----------------------------
+pred_list    = results['ANN_Predicted'].tolist()
+actual_list  = results['ANN_Actual'].tolist()
+residual_list= results['ANN_Residual'].tolist()
+set_list     = results['ANN_Split'].tolist()
+
+# -----------------------------
+# Metrics
+# -----------------------------
+print('Training R^2:',  r2_score(y_train.values, y_train_pred))
+print('Training RMSE:', np.sqrt(mean_squared_error(y_train.values, y_train_pred)))
+print('Validation R^2:', r2_score(y_val.values, y_val_pred))
+print('Validation RMSE:', np.sqrt(mean_squared_error(y_val.values, y_val_pred)))
+" );
+
+/// --- Create NEW table in JMP ---
+newTable = New Table( "ANN_Results",
+    Add Rows( N Rows( dt ) ),
+    New Column( "ANN_Predicted", Numeric, Continuous, Set Values( Python Get( pred_list ) ) ),
+    New Column( "ANN_Actual",    Numeric, Continuous, Set Values( Python Get( actual_list ) ) ),
+    New Column( "ANN_Residual",  Numeric, Continuous, Set Values( Python Get( residual_list ) ) ),
+    New Column( "ANN_Split",     Character,            Set Values( Python Get( set_list ) ) )
+);
+
+/// Open loss curve image
+Open( script_path || "/" || "ANN_loss_curve.png" );
