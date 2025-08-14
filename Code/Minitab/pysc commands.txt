@@ -3,3 +3,8 @@ decision tree - PYSC "C:\Users\johnsonjeeva\Desktop\Models\DT_Tree.py" "C1" "C22
 Ridge - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Ridge.py" "C1" "C220" 
 Lasso - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Lasso.py" "C1" "C220" 
 RandomForest - PYSC "C:\Users\johnsonjeeva\Desktop\Models\Random_Forest.py" "C1" "C220" "--maxdepth" "3"
+
+
+Xgboost Best Params: {'subsample': 0.7, 'reg_lambda': 0.5, 'reg_alpha': 0.1, 'n_estimators': 800, 'min_child_weight': 1, 'max_depth': 5, 'learning_rate': 0.03, 'colsample_bytree': 1.0}
+
+
