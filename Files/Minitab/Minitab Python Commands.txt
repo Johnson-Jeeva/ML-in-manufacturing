@@ -1,0 +1,39 @@
+1. HOW TO INSTALL REQUIRED LIBRARIES
+
+Open Terminal from the desired folder and run:
+
+	pip install numpy pandas matplotlib scikit-learn xgboost shap mtbpy
+
+Wait until installation completes.
+
+2. HOW TO USE PYSC COMMANDS IN MINITAB
+
+a. To get File Path
+	Right Click on the Python file and select copy as path
+
+b. Run Full Model Comparison & Analysis
+
+	pysc "C:\Users\ual-laptop\Desktop\Minitab\ClassicRegression.py" "C10" "C12"
+
+Example:
+
+pysc "C:\Users\ual-laptop\Desktop\Minitab\ClassicRegression.py" "C10" "C12"
+
+
+c. Run Prediction based on Custom Input
+
+	pysc "FULL_PATH_TO_SCRIPT.py" "predict" "C_TARGET" "C_LASTCOLUMN" "MODEL_NAME" "VALUE1,VALUE2,VALUE3,..."
+
+Example:
+
+pysc "C:\Users\YourName\Desktop\Predictnext.py" "predict" "C4" "C5" "lasso" "1.46,309.3,166.2,2.56,1.783,8.593"
+
+d. Available models:
+
+mlr
+ridge
+lasso
+elnet
+rf
+dt
+xgb
