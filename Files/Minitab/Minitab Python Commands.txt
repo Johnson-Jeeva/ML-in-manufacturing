@@ -2,38 +2,69 @@
 
 Open Terminal from the desired folder and run:
 
-	pip install numpy pandas matplotlib scikit-learn xgboost shap mtbpy
+    pip install numpy pandas matplotlib scikit-learn xgboost shap mtbpy
 
 Wait until installation completes.
+
+---
 
 2. HOW TO USE PYSC COMMANDS IN MINITAB
 
 a. To get File Path
-	Right Click on the Python file and select copy as path
+   Right Click on the Python file and select "Copy as path"
 
-b. Run Full Model Comparison & Analysis
+b. Run Full Model Training & Analysis
+   Use these commands to train models and generate performance metrics.
 
-	pysc "C:\Users\ual-laptop\Desktop\Minitab\ClassicRegression.py" "C10" "C12"
+   Format:
+   pysc "FULL_PATH_TO_SCRIPT.py" "C_TARGET" "C_LASTCOLUMN"
 
-Example:
+   Examples:
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\ClassicRegression.py" "C10" "C12"
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\AdvancedTrees.py" "C10" "C12"
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\NeuralNet.py" "C10" "C12"
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\HybridModel.py" "C10" "C12"
 
-pysc "C:\Users\ual-laptop\Desktop\Minitab\ClassicRegression.py" "C10" "C12"
-
+   Note for Anomaly Detection (Unsupervised):
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\AnomalyDetection.py" "C1" "C12"
+   (Where C1 is Timestamp/ID and C12 is the last feature column)
 
 c. Run Prediction based on Custom Input
+   Use this to get a specific output for new data points.
 
-	pysc "FULL_PATH_TO_SCRIPT.py" "predict" "C_TARGET" "C_LASTCOLUMN" "MODEL_NAME" "VALUE1,VALUE2,VALUE3,..."
+   Format:
+   pysc "PATH" "predict" "C_TARGET" "C_LASTCOLUMN" "MODEL_ID" "VALUE1,VALUE2,..."
 
-Example:
+   Examples:
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\NeuralNet.py" "predict" "C10" "C12" "ann" "41.2,608.4,89.1,182.8"
+   pysc "C:\Users\ual-laptop\Desktop\Minitab\HybridModel.py" "predict" "C10" "C12" "hybrid" "40.5,615.2,85.0,185.1"
 
-pysc "C:\Users\YourName\Desktop\Predictnext.py" "predict" "C4" "C5" "lasso" "1.46,309.3,166.2,2.56,1.783,8.593"
+---
 
-d. Available models:
+3. AVAILABLE MODEL IDENTIFIERS (MODEL_ID)
 
-mlr
-ridge
-lasso
-elnet
-rf
-dt
-xgb
+   [ CLASSIC MODELS ]
+   mlr    : Multiple Linear Regression
+   ridge  : Ridge Regression
+   lasso  : Lasso Regression
+   elnet  : Elastic Net
+
+   [ ADVANCED TREES ]
+   dt     : Decision Tree
+   rf     : Random Forest
+   xgb    : XGBoost
+
+   [ DEEP LEARNING & HYBRID ]
+   ann    : Deep Artificial Neural Network
+   hybrid : Hybrid Stacking (ANN + Random Forest)
+
+   [ ANOMALY DETECTION ]
+   autoencoder : Unsupervised Reconstruction Error
+
+---
+
+4. OUTPUTS & INTERPRETATION
+
+- Regression Models: Generates Predicted Values, Residuals, and Feature Importance.
+- Anomaly Detection: Generates a Reconstruction Error Score (higher = more unusual) 
+  and an Anomaly Flag (1 = Outlier, 0 = Normal).
