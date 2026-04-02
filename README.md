@@ -1,70 +1,87 @@
 # Machine Learning in Manufacturing – Model Testing
 
-This repository provides ready-to-use Python scripts for building, training and evaluating machine learning models on manufacturing datasets. It is designed for **JMP** and **Minitab** users, enabling quick experimentation with predictive models for applications such as **process optimization, quality control and performance forecasting**.
+This repository provides ready-to-use Python scripts for building, training, and evaluating machine learning models on manufacturing datasets. It is designed for **JMP** and **Minitab** users, enabling quick experimentation with predictive models for applications such as **process optimization, quality control, and performance forecasting**.
 
 ---
 
 ## Purpose
 
-- Train and compare multiple machine learning models on structured manufacturing datasets.  
-- Evaluate model performance using real or simulated industrial data.  
-- Practice feature selection, validation set creation, and performance visualization.  
-- Enable quick parameter tuning for improved accuracy and document results effectively.  
+- **Comparison:** Train and compare multiple ML models on structured manufacturing datasets.
+- **Evaluation:** Assess model performance using real or simulated industrial data.
+- **Workflow:** Practice feature selection, validation set creation, and performance visualization.
+- **Optimization:** Enable parameter tuning for improved accuracy and document results effectively.
 
 ---
 
 ## Supported Models
 
-- Decision Tree Regressor  
-- Random Forest Regressor  
-- XGBoost Regressor  
-- Ridge Regression  
-- Lasso Regression  
+### 1. Classic & Advanced Regression
+- **Linear:** Multiple Linear Regression (MLR), Ridge, Lasso, Elastic Net.
+- **Tree-Based:** Decision Tree, Random Forest, XGBoost Regressors.
+- **Deep Learning:** Artificial Neural Networks (ANN).
+- **Hybrid:** Stacking models (ANN + Random Forest).
+
+### 2. Anomaly Detection
+- **Unsupervised:** Autoencoder (Neural Network) for detecting process outliers using Reconstruction Error.
 
 Each model script provides:
-- Train/Test data split  
-- Predicted vs Actual plots  
-- Residual analysis  
-- Model accuracy metrics (R², RMSE)  
-- Feature importance or coefficient visualization (where applicable)  
+- Automated Train/Validation data splitting.
+- Predicted vs. Actual plots and Residual analysis.
+- Accuracy metrics ($R^2$, $RMSE$, $MAE$).
+- Feature Importance ranking or coefficient visualization.
 
 ---
 
 ## Dataset
 
-The dataset used for model testing is:
+The primary dataset for testing is:
+- **Exercise 15 Regression Trees Strength2.xlsx**
 
-- Exercise 15 Regression Trees Strength2.xlsx
-
-Note: This dataset should be opened in **JMP** or loaded into **Minitab** before running the scripts.
+*Note: Ensure this dataset is active in JMP or loaded into the Minitab worksheet before execution.*
 
 ---
 
 ## How to Use
 
-### 1. Python Setup
-1. Install **Python 3.10 or 3.11** from [python.org](https://www.python.org/).  
-2. Run the `LibrariesInstall.py` script to install all required dependencies:
+### 1. Environment Setup
+1. Install **Python 3.10+**.
+2. Open your terminal and install dependencies:
+   ```bash
+   pip install numpy pandas matplotlib scikit-learn xgboost shap mtbpy
+   ```
+
+### 2. Running in JSL (JMP)
+1. Open **JMP** and load your data table.
+2. Open and run the desired `.jsl` script (e.g., `Anomaly_Detection.jsl` or `RandomForest.jsl`).
+3. Use the built-in UI to select your **Target** and **Predictor** columns.
+4. View the generated results table and interactive Graph Builder plots.
+
+### 3. Running in Minitab (PYSC)
+Use the **PYSC** command in the Minitab command line. 
+
+**General Analysis:**
+`pysc "C:\Path\To\Script.py" "Target_Column" "Last_Column"`
+
+**Anomaly Detection:**
+`pysc "C:\Path\To\AnomalyDetection.py" "Timestamp_Column" "Last_Column"`
+
+**Custom Prediction:**
+`pysc "C:\Path\To\Script.py" "predict" "Target" "Last_Col" "Model_ID" "Value1,Value2..."`
 
 ---
 
-### 2. Running Scripts in JMP
-1. Open **JMP** and load the dataset.  
-2. Open the desired `.jsl` script:
-- Decision_Tree
-- RandomForest
-- XG_Boost_Regressor
-- Ridge
-- Lasso
-3. Run the script to:
-- Train the model and see the evaluation metrics
-- Generate a results table (Predicted, Actual, Residual, Data Split)  
-- Save relevant plots (PNG) for model evaluation  
+## Model Identifiers (for Predict Command)
+
+| Category | ID | Model |
+| :--- | :--- | :--- |
+| **Linear** | `mlr`, `ridge`, `lasso`, `elnet` | Linear/Regularized |
+| **Trees** | `dt`, `rf`, `xgb` | Decision Tree, Random Forest, XGBoost |
+| **Advanced** | `ann`, `hybrid` | Neural Net, ANN+RF Hybrid |
+| **Anomaly** | `autoencoder` | Outlier Detection |
 
 ---
 
-### 3. Running Scripts in Minitab
-1. Load the dataset in **Minitab**.  
-2. Use the **PYSC** command to run Python scripts. Example:
-```bash
-PYSC "C:\Path\To\Script.py" "<Target_Column>" "<Max_Column>" [parameters]
+## Outputs & Interpretation
+
+- **Regression:** Outputs Predicted Values, Residuals, and Feature Importance to identify which process variables (e.g., Temperature, Pressure) drive quality.
+- **Anomaly Detection:** Generates a **Reconstruction Error Score** (higher = more unusual) and an **Anomaly Flag** (1 = Outlier, 0 = Normal).
